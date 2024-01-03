@@ -2,6 +2,7 @@ from flask import Flask, redirect, url_for, session, request, render_template
 from authlib.integrations.flask_client import OAuth
 import requests
 from config import *
+import concurrent.futures
 import ipdb
 
 app = Flask(__name__)
@@ -10,6 +11,7 @@ app.secret_key = 'development'
 
 spotify_oauth = OAuth(app)
 youtube_oauth = OAuth(app)
+
 
 spotify = spotify_oauth.register(
     name = 'spotify',
@@ -38,21 +40,21 @@ youtube = youtube_oauth.register(
 def index():
     return render_template('index.html')
 
-@app.route('/login', methods = ['GET'])
-def login():
+@app.route('/spotify_login', methods = ['GET'])
+def spotify_login():
     callback = url_for(
-        'authorized', _external = True
+        'spotify_authorized', _external = True
     )
     return spotify.authorize_redirect(callback)
 
 @app.route('/logout')
 def logout():
-    session.pop('oauth_token', None)
+    session.pop('spotify_token', None)
     print('byebye')
     return redirect(url_for('index'))
 
-@app.route('/login/authorized')
-def authorized():
+@app.route('/spotify_login/authorized')
+def spotify_authorized():
     """
     
     """
@@ -63,36 +65,14 @@ def authorized():
             request.args('error_description')
         )
     session['spotify_token'] = (response['access_token'])
-    return redirect(url_for('playlist_selection'))
-
-@app.route('/playlist_selection')
-def playlist_selection():
-    playlist_list = get_playlists(session['spotify_token']) 
-    return render_template('playlist_selection.html', playlists = playlist_list)
-
-@app.route('/playlist_selection/add', methods = ['POST'])
-def add():
-    playlists = request.form.getlist('selected_playlists')
-
-    migrate_list = []
-    for p in playlists:
-        playlist = {get_title(session['spotify_token'], p): get_songs(session['spotify_token'], p)}
-        migrate_list.append(playlist)
-    session['migrate_list'] = migrate_list
-    
-    return redirect(url_for('migrate'))
-
-
-@app.route('/playlist_selection/migrate')
-def migrate():
     callback = url_for(
-        'success', _external = True
+        'youtube_login', _external = True
     )
-    print(callback)
     return youtube.authorize_redirect(callback)
+    # return redirect(url_for('playlist_selection'))
 
-@app.route('/playlist_selection/migrate/success')
-def success():
+@app.route('/youtube_login')
+def youtube_login():
     """
     
     """
@@ -103,12 +83,52 @@ def success():
             request.args('error_description')
         )
     session['youtube_token'] = (response['access_token'])
-    return redirect(url_for('yay'))
+    return redirect(url_for('playlist_selection'))
 
-@app.route('/yay')
-def yay():
-    print(session['migrate_list'])
-    return 'woohah'
+@app.route('/playlist_selection')
+def playlist_selection():
+    playlist_list = get_playlists(session['spotify_token']) 
+    return render_template('playlist_selection.html', playlists = playlist_list)
+
+@app.route('/playlist_selection/add', methods = ['POST'])
+def add():
+    playlists = request.form.getlist('selected_playlists')
+    session['playlists'] = playlists
+    # migrate_list = []
+    # for p in playlists:
+    #     playlist = {get_title(session['spotify_token'], p): get_songs(session['spotify_token'], p)}
+    #     migrate_list.append(playlist)
+    return redirect(url_for('migrate'))
+
+
+@app.route('/playlist_selection/migrate')
+def migrate():
+    migrate_list = {}
+    futures = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=300) as executor:
+        for p in session['playlists']:
+            title_future = executor.submit(get_title, session['spotify_token'], p)
+            songs_future = executor.submit(get_songs, session['spotify_token'], p)
+            futures.append((title_future, songs_future))
+
+    for title_future, songs_future in futures:
+        try:
+            title = title_future.result()  # Wait for the future result
+            songs = songs_future.result()
+            migrate_list[title] = songs
+        except Exception as e:
+            print(f"Error occurred: {e}")
+
+    # Rest of your code to render template or further processing
+    print(migrate_list.keys())
+    return render_template('index.html', migrate_list=migrate_list)
+    
+
+# @app.route('/yay')
+# def yay():
+#     # print(session['migrate_list'])
+#     return 'woohah'
 
 def get_playlists(access_token):
     response = requests.get('https://api.spotify.com/v1/me/playlists',
@@ -142,6 +162,7 @@ def get_songs(access_token, playlist_id):
         for t in tracks:
             track_name = t['track']['name']
             track_list.append(track_name)
+            # print(track_name)
     else:
         # Output an error message if something went wrong
         print(f"Error: {response.status_code}")
