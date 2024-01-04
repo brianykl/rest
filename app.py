@@ -103,26 +103,12 @@ def add():
 
 @app.route('/playlist_selection/migrate')
 def migrate():
-    migrate_list = {}
-    futures = []
+    playlists = bundle_playlists
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=300) as executor:
-        for p in session['playlists']:
-            title_future = executor.submit(get_title, session['spotify_token'], p)
-            songs_future = executor.submit(get_songs, session['spotify_token'], p)
-            futures.append((title_future, songs_future))
 
-    for title_future, songs_future in futures:
-        try:
-            title = title_future.result()  # Wait for the future result
-            songs = songs_future.result()
-            migrate_list[title] = songs
-        except Exception as e:
-            print(f"Error occurred: {e}")
 
-    # Rest of your code to render template or further processing
-    print(migrate_list.keys())
-    return render_template('index.html', migrate_list=migrate_list)
+
+    return render_template('index.html')
     
 
 # @app.route('/yay')
@@ -169,6 +155,53 @@ def get_songs(access_token, playlist_id):
         print(f"Message: {response.text}")
     return track_list
 
+def bundle_playlists():
+    migrate_list = {}
+    futures = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        for p in session['playlists']:
+            title_future = executor.submit(get_title, session['spotify_token'], p)
+            songs_future = executor.submit(get_songs, session['spotify_token'], p)
+            futures.append((title_future, songs_future))
+
+    for title_future, songs_future in futures:
+        try:
+            title = title_future.result()  # Wait for the future result
+            songs = songs_future.result()
+            migrate_list[title] = songs
+        except Exception as e:
+            print(f"Error occurred: {e}")
+    return migrate_list
+
+def create_playlist(access_token, playlist_name):
+    url = f'https://www.googleapis.com/youtube/v3/playlists?part=snippet%2Cstatus&key={youtube_api_key}'
+    headers = headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'snippet': {
+            'title': 'Sample playlist created via API',
+            # 'description': 'This is a sample playlist description.',
+            'tags': ['sample playlist', 'API call'],
+            'defaultLanguage': 'en'
+        },
+        'status': {
+            'privacyStatus': 'private'
+        }
+    }
+    response = requests.post(url, headers, data)
+    
+    if response.status_code == 200:
+        playlist = response.json()
+        print('yay')
+        return playlist['name']
+    else:
+        # Output an error message if something went wrong
+        print(f"Error: {response.status_code}")
+        print(f"Message: {response.text}")
 
 if __name__ == '__main__':
     app.run(port = 8888)
