@@ -183,9 +183,9 @@ def create_playlist(access_token, playlist_name):
     }
     data = {
         'snippet': {
-            'title': 'Sample playlist created via API',
+            f'{playlist_name}': 'Sample playlist created via API',
             # 'description': 'This is a sample playlist description.',
-            'tags': ['sample playlist', 'API call'],
+            'tags': ['API call'],
             'defaultLanguage': 'en'
         },
         'status': {
@@ -194,14 +194,93 @@ def create_playlist(access_token, playlist_name):
     }
     response = requests.post(url, headers, data)
     
-    if response.status_code == 200:
+    if response.status_code != 400:
         playlist = response.json()
-        print('yay')
-        return playlist['name']
+        return playlist['id']
     else:
         # Output an error message if something went wrong
         print(f"Error: {response.status_code}")
         print(f"Message: {response.text}")
 
+def get_song(access_token, song_name):
+    url = 'https://www.googleapis.com/youtube/v3/search'
+    params = {
+        'part': 'snippet',
+        'q': song_name,
+        'type': 'video',
+        'maxResults': 1,
+        'key': access_token
+    }
+    response = requests.get(url, params=params)
+
+    if response.status_code != 400:
+        song = response.json()['items'][0]['id']['videoId']
+        return song
+    else:
+        # Output an error message if something went wrong
+        print(f"Error: {response.status_code}")
+        print(f"Message: {response.text}")
+    return response.json()
+    
+
+def insert_song(access_token, playlist_id, video_id):
+    url = f'https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet&key={youtube_api_key}'
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'snippet': {
+            'playlistId': playlist_id,
+            'position': 0,
+            'resourceId': {
+                'kind': 'youtube#video',
+                'videoId': video_id
+            }
+        }
+    }
+    response = requests.post(url, headers=headers, json=data)
+    
+    if response.status_code != 400:
+        song = response.json()
+
+        return song
+    else:
+        # Output an error message if something went wrong
+        print(f"Error: {response.status_code}")
+        print(f"Message: {response.text}")
+
+def insert_playlists(spotify_playlists):
+    migrate_list = {}
+    futures = []
+
+    for p in spotify_playlists:
+        playlist_id = create_playlist(session['youtube_token'], p)
+        for song in spotify_playlists[p]:
+            video_id = get_song(session['youtube_token'], song)
+            insert_song(session['youtube_token'], playlist_id, video_id)
+    return migrate_list
+
+
+
 if __name__ == '__main__':
     app.run(port = 8888)
+
+
+
+
+
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+    #     for p in spotify_playlists:
+    #         playlist_id_future = executor.submit(create_playlist, session['youtube_token'], p)
+    #         songs_future = executor.submit(insert_song)
+    #         futures.append((playlist_id_future, songs_future))
+
+    # for title_future, songs_future in futures:
+    #     try:
+    #         title = title_future.result()  # Wait for the future result
+    #         songs = songs_future.result()
+    #         migrate_list[title] = songs
+    #     except Exception as e:
+    #         print(f"Error occurred: {e}")
