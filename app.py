@@ -5,50 +5,60 @@ from config import *
 import concurrent.futures
 import ipdb
 
+# Initialize Flask application
 app = Flask(__name__)
 app.debug = True
 app.secret_key = 'development'
 
+# OAuth setup for Spotify and YouTube
 spotify_oauth = OAuth(app)
 youtube_oauth = OAuth(app)
 
-
+# Register Spotify OAuth with necessary details
 spotify = spotify_oauth.register(
-    name = 'spotify',
-    base_url = 'https://api.spotify.com/v1/',
-    request_token_url = None,
-    access_token_url = 'https://accounts.spotify.com/api/token',
-    access_token_params  = None,
-    authorize_url = 'https://accounts.spotify.com/authorize',
-    client_id = spotify_client_id,
-    client_secret = spotify_client_secret
+    name='spotify',
+    base_url='https://api.spotify.com/v1/',
+    request_token_url=None,
+    access_token_url='https://accounts.spotify.com/api/token',
+    access_token_params=None,
+    authorize_url='https://accounts.spotify.com/authorize',
+    client_id=spotify_client_id,
+    client_secret=spotify_client_secret
 )
 
+# Register YouTube OAuth with necessary details
 youtube = youtube_oauth.register(
-    name = 'youtube',
-    base_url = 'https://www.googleapis.com/youtube/v3',
-    authorize_url = 'https://accounts.google.com/o/oauth2/auth',
-    authorize_params = None,
-    access_token_url = 'https://oauth2.googleapis.com/token',
-    access_token_params = None,
-    client_kwargs = {'scope': 'https://www.googleapis.com/auth/youtube'},
-    client_id = youtube_client_id,
-    client_secret = youtube_client_secret        
+    name='youtube',
+    base_url='https://www.googleapis.com/youtube/v3',
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+    authorize_params=None,
+    access_token_url='https://oauth2.googleapis.com/token',
+    access_token_params=None,
+    client_kwargs={'scope': 'https://www.googleapis.com/auth/youtube'},
+    client_id=youtube_client_id,
+    client_secret=youtube_client_secret        
 )
 
 @app.route('/')
 def index():
+    """
+    Route to the home page of the application.
+    """
     return render_template('index.html')
 
-@app.route('/spotify_login', methods = ['GET'])
+@app.route('/spotify_login', methods=['GET'])
 def spotify_login():
-    callback = url_for(
-        'spotify_authorized', _external = True
-    )
+    """
+    Route to handle Spotify login. Redirects to Spotify's authorization page.
+    """
+    callback = url_for('spotify_authorized', _external=True)
     return spotify.authorize_redirect(callback)
 
 @app.route('/logout')
 def logout():
+    """
+    Route to handle user logout. Clears the session and redirects to the home page.
+    """
     session.pop('spotify_token', None)
     print('byebye')
     return redirect(url_for('index'))
@@ -56,7 +66,8 @@ def logout():
 @app.route('/spotify_login/authorized')
 def spotify_authorized():
     """
-    
+    Callback route for Spotify authorization. 
+    Retrieves the access token and redirects to YouTube login for authorization.
     """
     response = spotify.authorize_access_token()
     if response is None or response.get('access_token') is None:
@@ -65,16 +76,13 @@ def spotify_authorized():
             request.args('error_description')
         )
     session['spotify_token'] = (response['access_token'])
-    callback = url_for(
-        'youtube_login', _external = True
-    )
+    callback = url_for('youtube_login', _external=True)
     return youtube.authorize_redirect(callback)
-    # return redirect(url_for('playlist_selection'))
 
 @app.route('/youtube_login')
 def youtube_login():
     """
-    
+    Route to handle YouTube login. Retrieves the access token.
     """
     response = youtube.authorize_access_token()
     if response is None or response.get('access_token') is None:
@@ -87,34 +95,30 @@ def youtube_login():
 
 @app.route('/playlist_selection')
 def playlist_selection():
+    """
+    Displays the playlist selection page after successful login.
+    """
     playlist_list = get_playlists(session['spotify_token']) 
-    return render_template('playlist_selection.html', playlists = playlist_list)
+    return render_template('playlist_selection.html', playlists=playlist_list)
 
-@app.route('/playlist_selection/add', methods = ['POST'])
+@app.route('/playlist_selection/add', methods=['POST'])
 def add():
+    """
+    Adds selected playlists to the session for migration.
+    """
     playlists = request.form.getlist('selected_playlists')
     session['playlists'] = playlists
-    # migrate_list = []
-    # for p in playlists:
-    #     playlist = {get_title(session['spotify_token'], p): get_songs(session['spotify_token'], p)}
-    #     migrate_list.append(playlist)
     return redirect(url_for('migrate'))
-
 
 @app.route('/playlist_selection/migrate')
 def migrate():
+    """
+    Initiates the playlist migration process.
+    """
     playlists = bundle_playlists
-
-
-
-
     return render_template('index.html')
     
 
-# @app.route('/yay')
-# def yay():
-#     # print(session['migrate_list'])
-#     return 'woohah'
 
 def get_playlists(access_token):
     response = requests.get('https://api.spotify.com/v1/me/playlists',
