@@ -115,8 +115,32 @@ def migrate():
     """
     Initiates the playlist migration process.
     """
-    playlists = bundle_playlists
+    playlists = bundle_playlists()
+    insert_playlists(playlists)
     return render_template('index.html')
+
+
+@app.route('/reset')
+def reset():
+    """
+    Deletes all playlists
+    """
+    playlist_ids = []
+    response = requests.delete('https://www.googleapis.com/youtube/v3/playlists?part=snippet%2Cstatus&key={youtube_api_key}&mine=true',
+                            headers = {'Authorization': f'Bearer {session["youtube_token"]}',
+                                       'Accept': 'application/json'}
+                            )
+    
+    playlists = response.json()
+    for p in playlists['items']:
+        playlist_ids.append(p['id'])
+        response = requests.post(f'https://www.googleapis.com/youtube/v3/playlists?id={p["id"]}&key={youtube_api_key}',
+                                 headers = {'Authorization': f'Bearer {session["youtube_token"]}',
+                                       'Accept': 'application/json'}
+                            )
+        print(response.status_code)
+    
+    return redirect(url_for('index'))
     
 
 
@@ -180,15 +204,14 @@ def bundle_playlists():
 
 def create_playlist(access_token, playlist_name):
     url = f'https://www.googleapis.com/youtube/v3/playlists?part=snippet%2Cstatus&key={youtube_api_key}'
-    headers = headers = {
+    headers = {
         'Authorization': f'Bearer {access_token}',
         'Accept': 'application/json',
         'Content-Type': 'application/json'
     }
     data = {
         'snippet': {
-            f'{playlist_name}': 'Sample playlist created via API',
-            # 'description': 'This is a sample playlist description.',
+            'title': f'{playlist_name}',
             'tags': ['API call'],
             'defaultLanguage': 'en'
         },
@@ -196,18 +219,24 @@ def create_playlist(access_token, playlist_name):
             'privacyStatus': 'private'
         }
     }
-    response = requests.post(url, headers, data)
+    response = requests.post(url, headers= headers, json = data)
     
-    if response.status_code != 400:
+    if response.status_code:
         playlist = response.json()
         return playlist['id']
     else:
         # Output an error message if something went wrong
         print(f"Error: {response.status_code}")
         print(f"Message: {response.text}")
+        print("boogabooga")
 
 def get_song(access_token, song_name):
     url = 'https://www.googleapis.com/youtube/v3/search'
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
     params = {
         'part': 'snippet',
         'q': song_name,
@@ -215,9 +244,10 @@ def get_song(access_token, song_name):
         'maxResults': 1,
         'key': access_token
     }
-    response = requests.get(url, params=params)
+    response = requests.get(url, headers = headers, params=params)
 
-    if response.status_code != 400:
+    
+    if response.status_code:
         song = response.json()['items'][0]['id']['videoId']
         return song
     else:
@@ -237,7 +267,6 @@ def insert_song(access_token, playlist_id, video_id):
     data = {
         'snippet': {
             'playlistId': playlist_id,
-            'position': 0,
             'resourceId': {
                 'kind': 'youtube#video',
                 'videoId': video_id
@@ -246,9 +275,8 @@ def insert_song(access_token, playlist_id, video_id):
     }
     response = requests.post(url, headers=headers, json=data)
     
-    if response.status_code != 400:
+    if response.status_code:
         song = response.json()
-
         return song
     else:
         # Output an error message if something went wrong
@@ -261,12 +289,10 @@ def insert_playlists(spotify_playlists):
 
     for p in spotify_playlists:
         playlist_id = create_playlist(session['youtube_token'], p)
-        for song in spotify_playlists[p]:
+        for song in spotify_playlists[p]:   
             video_id = get_song(session['youtube_token'], song)
             insert_song(session['youtube_token'], playlist_id, video_id)
     return migrate_list
-
-
 
 if __name__ == '__main__':
     app.run(port = 8888)
