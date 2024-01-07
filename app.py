@@ -126,7 +126,7 @@ def reset():
     Deletes all playlists
     """
     playlist_ids = []
-    response = requests.delete('https://www.googleapis.com/youtube/v3/playlists?part=snippet%2Cstatus&key={youtube_api_key}&mine=true',
+    response = requests.get('https://www.googleapis.com/youtube/v3/playlists?part=snippet%2Cstatus&key={youtube_api_key}&mine=true&maxResults=50',
                             headers = {'Authorization': f'Bearer {session["youtube_token"]}',
                                        'Accept': 'application/json'}
                             )
@@ -134,7 +134,7 @@ def reset():
     playlists = response.json()
     for p in playlists['items']:
         playlist_ids.append(p['id'])
-        response = requests.post(f'https://www.googleapis.com/youtube/v3/playlists?id={p["id"]}&key={youtube_api_key}',
+        response = requests.delete(f'https://www.googleapis.com/youtube/v3/playlists?id={p["id"]}&key={youtube_api_key}',
                                  headers = {'Authorization': f'Bearer {session["youtube_token"]}',
                                        'Accept': 'application/json'}
                             )
