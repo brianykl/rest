@@ -1,7 +1,7 @@
 from flask import Flask, redirect, url_for, session, request, render_template
 from authlib.integrations.flask_client import OAuth
 import requests
-from config import *
+import os
 import concurrent.futures
 import ipdb
 
@@ -9,6 +9,11 @@ import ipdb
 app = Flask(__name__)
 app.debug = True
 app.secret_key = 'development'
+
+spotify_client_id = os.environ.get("spotify_client_id")
+spotify_client_secret = os.environ.get("spotify_client_secret")
+youtube_client_id = os.environ.get("youtube_client_id")
+youtube_client_secret = os.environ.get("youtube_api_key")
 
 # OAuth setup for Spotify and YouTube
 spotify_oauth = OAuth(app)
