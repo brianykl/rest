@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <title>playlist converter</title>
+        </head>
+        <body>
+            <h1> playlist converter</h1>
+            <h3>
+                check off the playlists you want to migrate to youtube
+            </h3>
+            <form action =  "/playlist_selection/add" method = "post">
+                <h3>playlists</h3>
+                <ul>
+                    {% for p in playlists %}
+                        <li>
+                            <input type="checkbox" name="selected_playlists" value="{{ p['id'] }}">
+                            {{ p['name'] }} 
+                        </li>
+                        {% endfor %}
+                    </ul>
+                <button type="submit"> migrate</button>    
+            </form>        
+            <hr>
+            <h3>
+                <form action = "/reset" method = "post">
+                <input type="submit" value = 'reset'>
+                </form>
+            </h3>
+    </body>
+    </html>
