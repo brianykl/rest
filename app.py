@@ -117,10 +117,12 @@ def migrate():
     """
     playlists = bundle_playlists()
     insert_playlists(playlists)
+    session.pop('spotify_token')
+    session.pop('youtube_token')
     return render_template('index.html')
 
 
-@app.route('/reset')
+@app.route('/reset', methods=['POST'])
 def reset():
     """
     Deletes all playlists
@@ -139,12 +141,16 @@ def reset():
                                        'Accept': 'application/json'}
                             )
         print(response.status_code)
-    
+    session.pop('spotify_token')
+    session.pop('youtube_token')
     return redirect(url_for('index'))
     
 
 
 def get_playlists(access_token):
+    """
+    Get current user's list of playlists
+    """
     response = requests.get('https://api.spotify.com/v1/me/playlists',
                             headers = {'Authorization': f'Bearer {access_token}'})
     if response.status_code == 200:
@@ -157,6 +163,9 @@ def get_playlists(access_token):
         print(f"Message: {response.text}")
 
 def get_title(access_token, playlist_id):
+    """
+    Get title of a spotify playlist given spotify playlist id
+    """
     response = requests.get(f'https://api.spotify.com/v1/playlists/{playlist_id}',
                             headers = {'Authorization': f'Bearer {access_token}'})
     if response.status_code == 200:
@@ -168,6 +177,9 @@ def get_title(access_token, playlist_id):
         print(f"Message: {response.text}")
 
 def get_songs(access_token, playlist_id):
+    """
+    Gets songs from a playlist given a spotify playlist id
+    """
     response = requests.get(f'https://api.spotify.com/v1/playlists/{playlist_id}/tracks',
                             headers = {'Authorization': f'Bearer {access_token}'})
     track_list = []
@@ -184,6 +196,10 @@ def get_songs(access_token, playlist_id):
     return track_list
 
 def bundle_playlists():
+    """
+    Create a dictionary with playlist titles as keys and songs as the paired values.
+    Makes network calls to spotify, applies multithreading to make multiple calls at once
+    """
     migrate_list = {}
     futures = []
 
@@ -203,6 +219,9 @@ def bundle_playlists():
     return migrate_list
 
 def create_playlist(access_token, playlist_name):
+    """
+    creates a youtube playlist with a given title in current user's account
+    """
     url = f'https://www.googleapis.com/youtube/v3/playlists?part=snippet%2Cstatus&key={youtube_api_key}'
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -231,6 +250,9 @@ def create_playlist(access_token, playlist_name):
         print("boogabooga")
 
 def get_song(access_token, song_name):
+    """
+    gets first video in a search result given the name of a song
+    """
     url = 'https://www.googleapis.com/youtube/v3/search'
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -258,6 +280,9 @@ def get_song(access_token, song_name):
     
 
 def insert_song(access_token, playlist_id, video_id):
+    """
+    inserts a video into a youtube playlist given a youtube playlist id and video id
+    """
     url = f'https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet&key={youtube_api_key}'
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -284,9 +309,11 @@ def insert_song(access_token, playlist_id, video_id):
         print(f"Message: {response.text}")
 
 def insert_playlists(spotify_playlists):
+    """
+    given a dictionary with playlist titles as keys and songs as values,
+    create playlists in youtube with the given titles and insert the corresponding songs into the playlists
+    """
     migrate_list = {}
-    futures = []
-
     for p in spotify_playlists:
         playlist_id = create_playlist(session['youtube_token'], p)
         for song in spotify_playlists[p]:   
@@ -297,20 +324,3 @@ def insert_playlists(spotify_playlists):
 if __name__ == '__main__':
     app.run(port = 8888)
 
-
-
-
-
-    # with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-    #     for p in spotify_playlists:
-    #         playlist_id_future = executor.submit(create_playlist, session['youtube_token'], p)
-    #         songs_future = executor.submit(insert_song)
-    #         futures.append((playlist_id_future, songs_future))
-
-    # for title_future, songs_future in futures:
-    #     try:
-    #         title = title_future.result()  # Wait for the future result
-    #         songs = songs_future.result()
-    #         migrate_list[title] = songs
-    #     except Exception as e:
-    #         print(f"Error occurred: {e}")
