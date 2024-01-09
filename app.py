@@ -56,7 +56,7 @@ def spotify_login():
     """
     Route to handle Spotify login. Redirects to Spotify's authorization page.
     """
-    callback = url_for('authorized', _external=True)
+    callback = url_for('spotify_authorized', _external=True)
     spotify.authorize_redirect(callback)
 
 @app.route('/logout')
