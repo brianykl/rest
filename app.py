@@ -57,16 +57,16 @@ def spotify_login():
     Route to handle Spotify login. Redirects to Spotify's authorization page.
     """
     callback = url_for('authorized', _external=True)
-    spotify.authorize_redirect(callback)
+    return spotify.authorize_redirect(callback)
 
-@app.route('/logout')
-def logout():
-    """
-    Route to handle user logout. Clears the session and redirects to the home page.
-    """
-    session.pop('spotify_token', None)
-    print('byebye')
-    return redirect(url_for('index'))
+# @app.route('/logout')
+# def logout():
+#     """
+#     Route to handle user logout. Clears the session and redirects to the home page.
+#     """
+#     session.pop('spotify_token', None)
+#     print('byebye')
+#     return redirect(url_for('index'))
 
 @app.route('/spotify_login/authorized')
 def authorized():
@@ -81,7 +81,7 @@ def authorized():
             request.args('error_description')
         )
     session['spotify_token'] = (response['access_token'])
-    redirect(url_for("youtube_login"))
+    return redirect(url_for("youtube_login"))
 
 
 @app.route('/youtube_login')
