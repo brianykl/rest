@@ -56,17 +56,8 @@ def spotify_login():
     """
     Route to handle Spotify login. Redirects to Spotify's authorization page.
     """
-    callback = url_for('spotify_login', _external=True)
+    callback = url_for('authorized', _external=True)
     spotify.authorize_redirect(callback)
-    response = spotify.authorize_access_token()
-    if response is None or response.get('access_token') is None:
-        return 'access denied: reason = {0} error = {1}'.format(
-            request.args('error_reason'),
-            request.args('error_description')
-        )
-    session['spotify_token'] = (response['access_token'])
-    callback = url_for('youtube_login', _external=True)
-    return youtube.authorize_redirect(callback)
 
 @app.route('/logout')
 def logout():
@@ -77,9 +68,33 @@ def logout():
     print('byebye')
     return redirect(url_for('index'))
 
+@app.route('/spotify_login/authorized')
+def spotify_authorized():
+    """
+    Callback route for Spotify authorization. 
+    Retrieves the access token and redirects to YouTube login for authorization.
+    """
+    response = spotify.authorize_access_token()
+    if response is None or response.get('access_token') is None:
+        return 'access denied: reason = {0} error = {1}'.format(
+            request.args('error_reason'),
+            request.args('error_description')
+        )
+    session['spotify_token'] = (response['access_token'])
+    redirect(url_for("youtube_login"))
+
 
 @app.route('/youtube_login')
 def youtube_login():
+    """
+    Route to handle YouTube login. Retrieves the access token.
+    """
+    callback = url_for('youtube_login/authorized', _external=True)
+    return youtube.authorize_redirect(callback)
+
+
+@app.route('/youtube_login')
+def youtube_authorized():
     """
     Route to handle YouTube login. Retrieves the access token.
     """
