@@ -89,7 +89,7 @@ def youtube_login():
     """
     Route to handle YouTube login. Retrieves the access token.
     """
-    callback = url_for('youtube_login/authorized', _external=True)
+    callback = url_for('youtube_authorized', _external=True)
     return youtube.authorize_redirect(callback)
 
 
