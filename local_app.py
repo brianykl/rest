@@ -2,6 +2,7 @@ from flask import Flask, redirect, url_for, session, request, render_template
 from authlib.integrations.flask_client import OAuth
 import requests
 from config import *
+import os
 import concurrent.futures
 import ipdb
 
@@ -45,15 +46,8 @@ def index():
     """
     Route to the home page of the application.
     """
+    session.clear()
     return render_template('index.html')
-
-@app.route('/spotify_login', methods=['GET'])
-def spotify_login():
-    """
-    Route to handle Spotify login. Redirects to Spotify's authorization page.
-    """
-    callback = url_for('spotify_authorized', _external=True)
-    return spotify.authorize_redirect(callback)
 
 @app.route('/logout')
 def logout():
@@ -64,12 +58,28 @@ def logout():
     print('byebye')
     return redirect(url_for('index'))
 
+@app.route('/spotify_login', methods=['GET'])
+def spotify_login():
+    """
+    Route to handle Spotify login. Redirects to Spotify's authorization page.
+    """
+    callback = url_for('spotify_authorized', _external=True)
+    session['oauth_state'] = os.urandom(24).hex()
+    print(session['oauth_state'])
+    return spotify.authorize_redirect(callback, state = session['oauth_state'])
+
+
 @app.route('/spotify_login/authorized')
 def spotify_authorized():
     """
     Callback route for Spotify authorization. 
     Retrieves the access token and redirects to YouTube login for authorization.
     """
+    state = request.args.get('state')
+    stored_state = session.get('oauth_state')
+    print(session['oauth_state'])
+    if not state or state != stored_state:
+        return 'State mismatch. Potential CSRF attack.', 400
     response = spotify.authorize_access_token()
     if response is None or response.get('access_token') is None:
         return 'access denied: reason = {0} error = {1}'.format(
@@ -77,14 +87,29 @@ def spotify_authorized():
             request.args('error_description')
         )
     session['spotify_token'] = (response['access_token'])
-    callback = url_for('youtube_login', _external=True)
-    return youtube.authorize_redirect(callback)
+    return redirect(url_for("youtube_login"))
+
 
 @app.route('/youtube_login')
 def youtube_login():
     """
     Route to handle YouTube login. Retrieves the access token.
     """
+    callback = url_for('youtube_authorized', _external=True)
+    session['oauth_state'] = os.urandom(24).hex()
+    return youtube.authorize_redirect(callback, state = session['oauth_state'])
+
+
+@app.route('/youtube_login/youtube_authorized')
+def youtube_authorized():
+    """
+    Route to handle YouTube login. Retrieves the access token.
+    """
+    state = request.args.get('state')
+    stored_state = session.get('oauth_state')
+
+    if not state or state != stored_state:
+        return 'State mismatch. Potential CSRF attack.', 400
     response = youtube.authorize_access_token()
     if response is None or response.get('access_token') is None:
         return 'access denied: reason = {0} error = {1}'.format(

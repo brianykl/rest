@@ -49,6 +49,7 @@ def index():
     """
     Route to the home page of the application.
     """
+    session.clear()
     return render_template('index.html')
 
 @app.route('/spotify_login', methods=['GET'])
@@ -57,7 +58,8 @@ def spotify_login():
     Route to handle Spotify login. Redirects to Spotify's authorization page.
     """
     callback = url_for('authorized', _external=True)
-    return spotify.authorize_redirect(callback)
+    session['oauth_state'] = os.urandom(24).hex()
+    return spotify.authorize_redirect(callback, state = session['oauth_state'])
 
 # @app.route('/logout')
 # def logout():
@@ -74,6 +76,11 @@ def authorized():
     Callback route for Spotify authorization. 
     Retrieves the access token and redirects to YouTube login for authorization.
     """
+
+    state = request.args.get('state')
+    stored_state = session.get('oauth_state')
+    if not state or state != stored_state:
+        return 'State mismatch. Potential CSRF attack.', 400
     response = spotify.authorize_access_token()
     if response is None or response.get('access_token') is None:
         return 'access denied: reason = {0} error = {1}'.format(
@@ -90,7 +97,8 @@ def youtube_login():
     Route to handle YouTube login. Retrieves the access token.
     """
     callback = url_for('youtube_authorized', _external=True)
-    return youtube.authorize_redirect(callback)
+    session['oauth_state'] = os.urandom(24).hex()
+    return youtube.authorize_redirect(callback, state = session['oauth_state'])
 
 
 @app.route('/youtube_login/youtube_authorized')
@@ -98,6 +106,12 @@ def youtube_authorized():
     """
     Route to handle YouTube login. Retrieves the access token.
     """
+    state = request.args.get('state')
+    stored_state = session.get('oauth_state')
+
+    if not state or state != stored_state:
+        return 'State mismatch. Potential CSRF attack.', 400
+    
     response = youtube.authorize_access_token()
     if response is None or response.get('access_token') is None:
         return 'access denied: reason = {0} error = {1}'.format(
