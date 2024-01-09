@@ -13,7 +13,8 @@ app.secret_key = 'development'
 spotify_client_id = os.environ.get("spotify_client_id")
 spotify_client_secret = os.environ.get("spotify_client_secret")
 youtube_client_id = os.environ.get("youtube_client_id")
-youtube_client_secret = os.environ.get("youtube_api_key")
+youtube_client_secret = os.environ.get("youtube_client_secret")
+youtube_api_key = os.environ.get("youtube_api_key")
 
 # OAuth setup for Spotify and YouTube
 spotify_oauth = OAuth(app)
